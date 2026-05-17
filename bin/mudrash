@@ -1,0 +1,173 @@
+#!/bin/sh
+# mudrash — CLI entry point
+# v0.2.0
+#
+# This script is POSIX-sh so it runs the same when invoked from any login
+# shell. It locates its sibling lib/ and mudrash.zsh by resolving its own
+# directory (with symlink following).
+
+set -eu
+
+MUDRASH_CLI_VERSION='0.2.0'
+
+# --- Locate ourselves -------------------------------------------------------
+
+# Resolve $0 through any symlinks so we can find lib/ relative to the real
+# install location, not the PATH entry that called us.
+_resolve_script_dir() {
+    src=$1
+    while [ -h "$src" ]; do
+        dir=$(cd -P "$(dirname "$src")" && pwd)
+        src=$(readlink "$src")
+        case "$src" in
+            /*) ;;
+            *)  src="$dir/$src" ;;
+        esac
+    done
+    cd -P "$(dirname "$src")" && pwd
+}
+
+SCRIPT_DIR=$(_resolve_script_dir "$0")
+# Install layout: $MUDRASH_HOME/{bin/mudrash, lib/, mudrash.zsh, install.sh}
+MUDRASH_HOME=$(dirname "$SCRIPT_DIR")
+LIB_DIR="$MUDRASH_HOME/lib"
+
+MARKER_OPEN='# >>> mudrash >>>'
+MARKER_CLOSE='# <<< mudrash <<<'
+
+# --- Subcommands -----------------------------------------------------------
+
+usage() {
+    cat <<EOF
+mudrash $MUDRASH_CLI_VERSION — per-project color identity for AI agents
+
+USAGE:
+    mudrash install     Install (or re-install) the hook into ~/.zshrc
+    mudrash uninstall   Remove the hook and installed files
+    mudrash status      Show install location, env vars, and current color
+    mudrash version     Print version
+    mudrash --help      Print this help
+
+ENVIRONMENT:
+    MUDRASH_MODE        Project ID source. Only 'basename' is honored
+                        ('path' mode is planned).
+    MUDRASH_AGENTS      Space-separated commands to detect (default: "claude codex").
+    MUDRASH_DISABLE     Set to 1 to disable without uninstalling
+                        (gates OSC 0 title, OSC 11 background, and prompt prefix).
+
+See https://github.com/tsutsuhiro/mudrash for full documentation.
+EOF
+}
+
+cmd_version() {
+    echo "$MUDRASH_CLI_VERSION"
+}
+
+cmd_status() {
+    if [ ! -f "$LIB_DIR/hash.zsh" ] || [ ! -f "$LIB_DIR/color.zsh" ]; then
+        printf 'mudrash: cannot locate library at %s\n' "$LIB_DIR" >&2
+        exit 1
+    fi
+    # shellcheck disable=SC1091
+    . "$LIB_DIR/hash.zsh"
+    # shellcheck disable=SC1091
+    . "$LIB_DIR/color.zsh"
+
+    label=$(basename "$PWD")
+    hue=$(mudrash_hue "$label")
+    # Use the same wrapper preexec uses, so status reflects the actual
+    # color mudrash will emit via OSC 11.
+    bg_hex=$(mudrash_bg_color "$hue")
+    bg_rgb=$(mudrash_hex_to_rgb "$bg_hex")
+    br=$(echo "$bg_rgb" | cut -d' ' -f1)
+    bg=$(echo "$bg_rgb" | cut -d' ' -f2)
+    bb=$(echo "$bg_rgb" | cut -d' ' -f3)
+
+    printf 'mudrash %s\n' "$MUDRASH_CLI_VERSION"
+    printf 'Install location: %s\n' "$MUDRASH_HOME"
+    printf '\n'
+    printf 'Environment:\n'
+    printf '  MUDRASH_MODE     = %s\n' "${MUDRASH_MODE:-basename}"
+    printf '  MUDRASH_AGENTS   = %s\n' "${MUDRASH_AGENTS:-claude codex}"
+    printf '  MUDRASH_DISABLE  = %s\n' "${MUDRASH_DISABLE:-(unset)}"
+    printf '\n'
+    printf 'Current directory: %s\n' "$PWD"
+    printf '  label   = %s\n' "$label"
+    printf '  hue     = %s\n' "$hue"
+    # 24-bit ANSI swatch for the OSC 11 background color.
+    printf '  bg      = \033[48;2;%d;%d;%dm    \033[0m  #%s\n' "$br" "$bg" "$bb" "$bg_hex"
+}
+
+cmd_install() {
+    # Delegate to install.sh if it's been copied to the install dir; otherwise
+    # tell the user to run install.sh from a fresh clone. The brief asks for
+    # `mudrash install` to be idempotent, which install.sh already is.
+    if [ -x "$MUDRASH_HOME/install.sh" ]; then
+        exec "$MUDRASH_HOME/install.sh"
+    fi
+    printf 'mudrash: install.sh not found at %s\n' "$MUDRASH_HOME/install.sh" >&2
+    printf 'To re-install, run install.sh from a fresh clone:\n' >&2
+    printf '    git clone https://github.com/tsutsuhiro/mudrash && ./mudrash/install.sh\n' >&2
+    exit 1
+}
+
+cmd_uninstall() {
+    # Reset the terminal background to its default. mudrash tints the bg
+    # via OSC 11 on agent invocation; on uninstall we restore so the
+    # terminal doesn't stay branded for a tool the user just removed.
+    printf '\033]111\007'
+
+    rcfile="$HOME/.zshrc"
+    if [ -f "$rcfile" ]; then
+        tmp=$(mktemp)
+        awk -v open="$MARKER_OPEN" -v endmark="$MARKER_CLOSE" '
+            $0 == open    { skip = 1; next }
+            skip && $0 == endmark { skip = 0; next }
+            skip          { next }
+            { print }
+        ' "$rcfile" > "$tmp"
+        # Collapse runs of blank lines left by removing the block.
+        awk 'NF { blank=0; print; next } { if (!blank) print; blank=1 }' "$tmp" > "$rcfile"
+        rm -f "$tmp"
+        printf 'Removed mudrash block from %s\n' "$rcfile"
+    fi
+
+    # Refuse to delete anything that doesn't both (a) sit at a recognized
+    # install suffix and (b) contain the files we'd have put there.
+    if [ -f "$MUDRASH_HOME/mudrash.zsh" ] && [ -f "$MUDRASH_HOME/bin/mudrash" ]; then
+        case "$MUDRASH_HOME" in
+            */.local/share/mudrash|*/.mudrash)
+                rm -rf "$MUDRASH_HOME"
+                printf 'Removed %s\n' "$MUDRASH_HOME"
+                ;;
+            *)
+                printf 'Skipping removal of %s (not a standard install path).\n' "$MUDRASH_HOME"
+                printf 'Delete it manually if you want a full wipe.\n'
+                ;;
+        esac
+    else
+        printf 'Skipping removal of %s (no mudrash install detected there).\n' "$MUDRASH_HOME"
+    fi
+
+    printf '\nUninstall complete. Reload your shell: source ~/.zshrc\n'
+}
+
+# --- Dispatch --------------------------------------------------------------
+
+if [ $# -eq 0 ]; then
+    usage
+    exit 0
+fi
+
+case "$1" in
+    install)           shift; cmd_install   "$@" ;;
+    uninstall)         shift; cmd_uninstall "$@" ;;
+    status)            shift; cmd_status    "$@" ;;
+    version|--version) cmd_version ;;
+    help|--help|-h)    usage ;;
+    *)
+        printf "mudrash: unknown command '%s'\n" "$1" >&2
+        usage >&2
+        exit 1
+        ;;
+esac

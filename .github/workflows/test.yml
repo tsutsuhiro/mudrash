@@ -1,0 +1,46 @@
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Minimum-privilege token. Mudrash CI only needs to read the repo to run
+# tests; it never writes back. Explicit declaration also blocks workflow
+# permission escalation via malicious PRs.
+permissions: read-all
+
+jobs:
+  bats:
+    name: bats (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest]
+    steps:
+      # Pinned to commit SHA (v4.3.1) instead of @v4 tag — defense against
+      # supply-chain tag-rewriting attacks like tj-actions/changed-files
+      # (CVE-2025-30066). Update by editing the SHA + the trailing comment.
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
+
+      - name: Install zsh + bats (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y zsh bats
+
+      - name: Install bats (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install bats-core
+
+      - name: Show versions
+        run: |
+          zsh --version
+          bats --version
+          awk --version 2>/dev/null || true
+
+      - name: Run tests
+        run: bats test/
