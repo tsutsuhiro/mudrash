@@ -53,17 +53,17 @@ If your agent introspects its environment, mudrash is invisible.
 
 ## Installation
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/tsutsuhiro/mudrash/main/install.sh | sh
-```
-
-Or, from a clone:
+`install.sh` runs entirely from a local clone (it never downloads code at runtime),
+so install by cloning a **pinned release tag** and running the script:
 
 ```bash
-git clone https://github.com/tsutsuhiro/mudrash && ./mudrash/install.sh
+git clone --branch v0.2.0 --depth 1 https://github.com/tsutsuhiro/mudrash.git
+./mudrash/install.sh
 ```
 
-This adds a small block to your shell's rc file (`.zshrc` only for now). Inspect the script before running.
+Pinning to `v0.2.0` (rather than the mutable `main` branch) means you get a fixed,
+reviewable revision. Inspect `install.sh` before running it. It adds a small block to
+your shell's rc file (`.zshrc` only for now).
 
 To uninstall:
 
@@ -228,17 +228,16 @@ mudrash は **純粋なデコレータ層** です。以下を一切行いませ
 
 ## インストール
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/tsutsuhiro/mudrash/main/install.sh | sh
-```
-
-クローンから:
+`install.sh` はローカルのクローンから完結して動作します（実行時にコードをダウンロードしません）。
+そのため、**固定されたリリースタグ**をクローンしてスクリプトを実行してください:
 
 ```bash
-git clone https://github.com/tsutsuhiro/mudrash && ./mudrash/install.sh
+git clone --branch v0.2.0 --depth 1 https://github.com/tsutsuhiro/mudrash.git
+./mudrash/install.sh
 ```
 
-シェルの rc ファイル（現状 `.zshrc` のみ）に小さなブロックを追加します。実行前にスクリプトを確認してください。
+可変な `main` ブランチではなく `v0.2.0` に固定することで、レビュー可能な固定リビジョンを取得できます。
+実行前に `install.sh` を確認してください。シェルの rc ファイル（現状 `.zshrc` のみ）に小さなブロックを追加します。
 
 アンインストール:
 

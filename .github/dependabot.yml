@@ -1,0 +1,10 @@
+version: 2
+# Supply-chain: keep the SHA-pinned GitHub Actions current. Dependabot bumps the
+# pinned commit SHA (and its version comment) as new releases land, so pinning does
+# not mean going stale. mudrash ships no package dependencies, so Actions is the only
+# ecosystem to watch.
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
