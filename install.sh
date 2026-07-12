@@ -2,8 +2,8 @@
 # install.sh — bootstrap installer for mudrash
 #
 # Run from a clone of the repo:    ./install.sh
-# Or via the hosted one-liner:
-#   curl -fsSL https://raw.githubusercontent.com/tsutsuhiro/mudrash/main/install.sh | sh
+# (This script copies the sibling mudrash files from the clone; it does NOT download
+#  anything at runtime. Clone a pinned tag, e.g. `git clone --branch v0.2.0 ...`.)
 #
 # Idempotent. Adds a marker block to ~/.zshrc that sources mudrash.zsh and
 # prepends $INSTALL_DIR/bin to PATH so `mudrash` is callable.
