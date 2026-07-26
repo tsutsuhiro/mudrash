@@ -23,7 +23,7 @@ jobs:
       # Pinned to commit SHA (v4.3.1) instead of @v4 tag — defense against
       # supply-chain tag-rewriting attacks like tj-actions/changed-files
       # (CVE-2025-30066). Update by editing the SHA + the trailing comment.
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
       - name: Install zsh + bats (Linux)
         if: runner.os == 'Linux'
